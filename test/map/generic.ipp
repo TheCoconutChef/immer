@@ -728,6 +728,19 @@ TEST_CASE("issue 134")
     }
 }
 
+TEST_CASE("issue 303")
+{
+    int a[20];
+    auto m = map();
+    for (auto i = 0; i < 20; ++i) {
+        m = m.set(KElem(a + i), KElem(a + i));
+    }
+    auto v        = std::vector(m.begin(), m.end());
+    std::size_t n = std::ranges::distance(m.begin(), m.end());
+    CHECK(m.size() == n);
+    CHECK(v.size() == n);
+}
+
 } // namespace
 
 void test_diff(unsigned old_num,

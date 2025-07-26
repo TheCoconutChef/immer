@@ -17,12 +17,11 @@ namespace rbts {
 
 template <typename T, typename MP, bits_t B, bits_t BL>
 struct rbtree_iterator
-    : iterator_facade<rbtree_iterator<T, MP, B, BL>,
-                      std::random_access_iterator_tag,
-                      T,
-                      const T&,
-                      std::ptrdiff_t,
-                      const T*>
+    : random_access_iterator_facade<rbtree_iterator<T, MP, B, BL>,
+                                    T,
+                                    const T&,
+                                    std::ptrdiff_t,
+                                    const T*>
 {
     using tree_t = rbtree<T, MP, B, BL>;
 

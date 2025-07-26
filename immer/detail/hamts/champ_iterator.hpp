@@ -17,12 +17,11 @@ namespace hamts {
 
 template <typename T, typename Hash, typename Eq, typename MP, bits_t B>
 struct champ_iterator
-    : iterator_facade<champ_iterator<T, Hash, Eq, MP, B>,
-                      std::forward_iterator_tag,
-                      T,
-                      const T&,
-                      std::ptrdiff_t,
-                      const T*>
+    : forward_iterator_facade<champ_iterator<T, Hash, Eq, MP, B>,
+                              T,
+                              const T&,
+                              std::ptrdiff_t,
+                              const T*>
 {
     using tree_t = champ<T, Hash, Eq, MP, B>;
     using node_t = typename tree_t::node_t;

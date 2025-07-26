@@ -54,19 +54,15 @@ struct iterator_core_access
     }
 };
 
-/*!
- * Minimalistic reimplementation of boost::iterator_facade
- */
 template <typename DerivedT,
-          typename IteratorCategoryT,
           typename T,
           typename ReferenceT      = T&,
           typename DifferenceTypeT = std::ptrdiff_t,
           typename PointerT        = T*>
-class iterator_facade
+class forward_iterator_facade
 {
 public:
-    using iterator_category = IteratorCategoryT;
+    using iterator_category = std::forward_iterator_tag;
     using value_type        = T;
     using difference_type   = DifferenceTypeT;
     using pointer           = PointerT;
@@ -75,39 +71,37 @@ public:
 protected:
     using access_t = iterator_core_access;
 
-    constexpr static auto is_random_access =
-        std::is_base_of<std::random_access_iterator_tag,
-                        IteratorCategoryT>::value;
-    constexpr static auto is_bidirectional =
-        std::is_base_of<std::bidirectional_iterator_tag,
-                        IteratorCategoryT>::value;
-
-    const DerivedT& derived() const
+    template <typename SelfT>
+    const DerivedT& derived(const SelfT* self) const
     {
-        static_assert(std::is_base_of<iterator_facade, DerivedT>::value,
+        static_assert(std::is_base_of<SelfT, DerivedT>::value,
                       "must pass a derived thing");
-        return *static_cast<const DerivedT*>(this);
+        return *static_cast<const DerivedT*>(self);
     }
-    DerivedT& derived()
+
+    template <typename SelfT>
+    DerivedT& derived(SelfT* self)
     {
-        static_assert(std::is_base_of<iterator_facade, DerivedT>::value,
+        static_assert(std::is_base_of<SelfT, DerivedT>::value,
                       "must pass a derived thing");
-        return *static_cast<DerivedT*>(this);
+        return *static_cast<DerivedT*>(self);
     }
 
 public:
-    ReferenceT operator*() const { return access_t::dereference(derived()); }
-    PointerT operator->() const { return &access_t::dereference(derived()); }
-    ReferenceT operator[](DifferenceTypeT n) const
+    ReferenceT operator*() const
     {
-        static_assert(is_random_access, "");
-        return *(derived() + n);
+        return access_t::dereference(derived(this));
+    }
+    PointerT operator->() const
+    {
+        return &access_t::dereference(derived(this));
     }
 
     friend bool operator==(const DerivedT& a, const DerivedT& b)
     {
         return access_t::equal(a, b);
     }
+
     friend bool operator!=(const DerivedT& a, const DerivedT& b)
     {
         return !access_t::equal(a, b);
@@ -115,83 +109,131 @@ public:
 
     DerivedT& operator++()
     {
-        access_t::increment(derived());
-        return derived();
-    }
-    DerivedT operator++(int)
-    {
-        auto tmp = derived();
-        access_t::increment(derived());
-        return tmp;
+        access_t::increment(derived(this));
+        return derived(this);
     }
 
-    DerivedT& operator--()
+    DerivedT operator++(int)
     {
-        static_assert(is_bidirectional || is_random_access, "");
-        access_t::decrement(derived());
-        return derived();
-    }
-    DerivedT operator--(int)
-    {
-        static_assert(is_bidirectional || is_random_access, "");
-        auto tmp = derived();
-        access_t::decrement(derived());
+        auto tmp = derived(this);
+        access_t::increment(derived(this));
         return tmp;
     }
 
     DerivedT& operator+=(DifferenceTypeT n)
     {
-        access_t::advance(derived(), n);
-        return derived();
+        access_t::advance(derived(this), n);
+        return derived(this);
     }
+
     DerivedT& operator-=(DifferenceTypeT n)
     {
-        access_t::advance(derived(), -n);
-        return derived();
+        access_t::advance(derived(this), -n);
+        return derived(this);
+    }
+};
+
+template <typename DerivedT,
+          typename T,
+          typename ReferenceT      = T&,
+          typename DifferenceTypeT = std::ptrdiff_t,
+          typename PointerT        = T*>
+class bidirectional_iterator_facade
+    : public forward_iterator_facade<DerivedT,
+                                     T,
+                                     ReferenceT,
+                                     DifferenceTypeT,
+                                     PointerT>
+{
+    using base_t = forward_iterator_facade<DerivedT,
+                                           T,
+                                           ReferenceT,
+                                           DifferenceTypeT,
+                                           PointerT>;
+
+public:
+    using iterator_category = std::bidirectional_iterator_tag;
+
+    DerivedT& operator--()
+    {
+        base_t::access_t::decrement(base_t::derived(this));
+        return base_t::derived(this);
+    }
+
+    DerivedT operator--(int)
+    {
+        auto tmp = base_t::derived(this);
+        base_t::access_t::decrement(base_t::derived(this));
+        return tmp;
+    }
+};
+
+template <typename DerivedT,
+          typename T,
+          typename ReferenceT      = T&,
+          typename DifferenceTypeT = std::ptrdiff_t,
+          typename PointerT        = T*>
+class random_access_iterator_facade
+    : public bidirectional_iterator_facade<DerivedT,
+                                           T,
+                                           ReferenceT,
+                                           DifferenceTypeT,
+                                           PointerT>
+{
+    using base_t = bidirectional_iterator_facade<DerivedT,
+                                                 T,
+                                                 ReferenceT,
+                                                 DifferenceTypeT,
+                                                 PointerT>;
+
+public:
+    using iterator_category = std::random_access_iterator_tag;
+
+    ReferenceT operator[](DifferenceTypeT n) const
+    {
+        return *(base_t::derived(this) + n);
     }
 
     DerivedT operator+(DifferenceTypeT n) const
     {
-        static_assert(is_random_access, "");
-        auto tmp = derived();
+        auto tmp = base_t::derived(this);
         return tmp += n;
     }
+
     friend DerivedT operator+(DifferenceTypeT n, const DerivedT& i)
     {
-        static_assert(is_random_access, "");
         return i + n;
     }
+
     DerivedT operator-(DifferenceTypeT n) const
     {
-        static_assert(is_random_access, "");
-        auto tmp = derived();
+        auto tmp = base_t::derived(this);
         return tmp -= n;
     }
+
     friend DifferenceTypeT operator-(const DerivedT& a, const DerivedT& b)
     {
-        static_assert(is_random_access, "");
-        return access_t::distance_to(b, a);
+        return base_t::access_t::distance_to(b, a);
     }
 
     friend bool operator<(const DerivedT& a, const DerivedT& b)
     {
-        static_assert(is_random_access, "");
-        return access_t::distance_to(a, b) > 0;
+        return base_t::access_t::distance_to(a, b) > 0;
     }
+
     friend bool operator<=(const DerivedT& a, const DerivedT& b)
     {
-        static_assert(is_random_access, "");
-        return access_t::distance_to(a, b) >= 0;
+        return base_t::access_t::distance_to(a, b) >= 0;
     }
+
     friend bool operator>(const DerivedT& a, const DerivedT& b)
     {
-        static_assert(is_random_access, "");
-        return access_t::distance_to(a, b) < 0;
+        return base_t::access_t::distance_to(a, b) < 0;
     }
+
     friend bool operator>=(const DerivedT& a, const DerivedT& b)
     {
-        static_assert(is_random_access, "");
-        return access_t::distance_to(a, b) <= 0;
+        return base_t::access_t::distance_to(a, b) <= 0;
     }
 };
 
